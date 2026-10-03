@@ -192,15 +192,50 @@ static void handleTapGesture(UITapGestureRecognizer *gesture) {
 %group VCamHooks
 
 %hook AVCaptureSession
-- (void)startRunning { %orig; }
-- (void)stopRunning { %orig; }
+- (void)startRunning {
+    %orig;
+}
+- (void)stopRunning {
+    %orig;
+}
 %end
 
 %hook AVCaptureVideoDataOutput
-- (void)setSampleBufferDelegate:(id<AVCaptureVideoDataOutputSampleBufferDelegate>)delegate 
+- (void)setSampleBufferDelegate:(id<AVCaptureVideoDataOutputSampleBufferDelegate>)delegate
                           queue:(dispatch_queue_t)queue {
     %orig;
 }
+%end
+
+%hook NSObject
+- (void)captureOutput:(AVCaptureOutput *)output
+    didOutputSampleBuffer:(CMSampleBufferRef)sampleBuffer
+           fromConnection:(AVCaptureConnection *)connection {
+    if (g_vcamEnabled && [[MediaManager sharedManager] isRunning]) {
+        CMSampleBufferRef fakeFrame = [[MediaManager sharedManager] nextVideoFrame];
+        if (fakeFrame) {
+            %orig(output, fakeFrame, connection);
+            CFRelease(fakeFrame);
+            return;
+        }
+    }
+    %orig;
+}
+%end
+
+%hook AVCapturePhotoOutput
+- (void)capturePhotoWithSettings:(AVCapturePhotoSettings *)settings
+                        delegate:(id<AVCapturePhotoCaptureDelegate>)delegate {
+    %orig;
+}
+%end
+
+%hook AVCaptureVideoPreviewLayer
+- (void)setSession:(AVCaptureSession *)session {
+    %orig;
+}
+%end
+
 %end
 
 // Intercept frame delegate callback -> substitute with fake frames

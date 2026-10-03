@@ -17,7 +17,7 @@ jobs:
 
     - name: Install dependencies
       run: |
-        brew install ldid xz
+        brew install ldid xz dpkg
       timeout-minutes: 10
 
     - name: Install Theos
@@ -37,10 +37,12 @@ jobs:
         ls $HOME/theos/sdks/
       timeout-minutes: 10
 
-    - name: Build Tweak
+        - name: Build Tweak
       run: |
         export THEOS=$HOME/theos
         export PATH=$HOME/theos/bin:$PATH
+        chmod 755 layout/DEBIAN/postinst layout/DEBIAN/postrm
+        sed -i '' '/^Conflicts:/d;/^Replaces:/d;/^Provides:/d' control
         make clean
         make package FINALPACKAGE=1 2>&1
         echo "Build complete. Packages:"

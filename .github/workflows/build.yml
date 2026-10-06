@@ -1,4 +1,4 @@
-name: Build VCam Rootful
+name: Build VCam iOS 14 Rootful
 
 on:
   push:
@@ -21,8 +21,8 @@ jobs:
 
       - name: Install Theos
         run: |
-          export THEOS=~/theos
-          git clone --recursive https://github.com/theos/theos.git ~/theos
+          export THEOS=$HOME/theos
+          git clone --recursive https://github.com/theos/theos.git $HOME/theos
           echo "THEOS=$HOME/theos" >> $GITHUB_ENV
           echo "PATH=$HOME/theos/bin:$PATH" >> $GITHUB_ENV
         timeout-minutes: 10
@@ -33,10 +33,10 @@ jobs:
           mkdir -p $HOME/theos/sdks
           tar -xf /tmp/sdk.tar.xz -C $HOME/theos/sdks
           echo "Installed SDKs:"
-          ls $HOME/theos/sdks/
+          ls -lh $HOME/theos/sdks/
         timeout-minutes: 10
 
-      - name: Build Rootful VCam
+      - name: Build VCam
         run: |
           export THEOS=$HOME/theos
           export PATH=$HOME/theos/bin:$PATH
@@ -46,17 +46,36 @@ jobs:
           sed -i '' '/^Conflicts:/d;/^Replaces:/d;/^Provides:/d' control
 
           make clean
-          make package FINALPACKAGE=1 THEOS_PACKAGE_SCHEME=rootful
+          make package FINALPACKAGE=1
 
-          echo "Build complete."
           echo "Generated packages:"
           ls -lh packages/
 
           echo "Package metadata:"
           for deb in packages/*.deb; do
-            dpkg-deb -I "$deb"
+            echo "===== $deb ====="
+            dpkg-deb -f "$deb" Package Version Architecture
           done
         timeout-minutes: 15
+
+      - name: Verify Rootful Package
+        run: |
+          DEB=$(find packages -name "*.deb" | head -1)
+
+          if [ -z "$DEB" ]; then
+            echo "No .deb generated"
+            exit 1
+          fi
+
+          ARCH=$(dpkg-deb -f "$DEB" Architecture)
+
+          echo "Package: $DEB"
+          echo "Architecture: $ARCH"
+
+          if [ "$ARCH" != "iphoneos-arm" ]; then
+            echo "ERROR: Expected iphoneos-arm for rootful Taurine."
+            exit 1
+          fi
 
       - name: Prepare Output
         run: |
@@ -64,16 +83,9 @@ jobs:
 
           DEB=$(find packages -name "*.deb" | head -1)
 
-          if [ -z "$DEB" ]; then
-            echo "No .deb package was generated!"
-            exit 1
-          fi
-
-          echo "Found package: $DEB"
-
           cp "$DEB" output/
 
-          echo "Final output:"
+          echo "Final package:"
           ls -lh output/
 
       - name: Upload VCam Rootful DEB
